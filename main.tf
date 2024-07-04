@@ -142,7 +142,8 @@ module "webhook" {
       }
     }
   }
-  sqs_workflow_job_queue = length(aws_sqs_queue.webhook_events_workflow_job_queue) > 0 ? aws_sqs_queue.webhook_events_workflow_job_queue[0] : null
+  matcher_config_parameter_store_tier = var.matcher_config_parameter_store_tier
+  sqs_workflow_job_queue              = length(aws_sqs_queue.webhook_events_workflow_job_queue) > 0 ? aws_sqs_queue.webhook_events_workflow_job_queue[0] : null
 
   github_app_parameters = {
     webhook_secret = module.ssm.parameters.github_app_webhook_secret
@@ -157,6 +158,7 @@ module "webhook" {
   lambda_zip                                    = var.webhook_lambda_zip
   lambda_memory_size                            = var.webhook_lambda_memory_size
   lambda_timeout                                = var.webhook_lambda_timeout
+  lambda_tags                                   = var.lambda_tags
   tracing_config                                = var.tracing_config
   logging_retention_in_days                     = var.logging_retention_in_days
   logging_kms_key_id                            = var.logging_kms_key_id
@@ -244,6 +246,7 @@ module "runners" {
   lambda_timeout_scale_down        = var.runners_scale_down_lambda_timeout
   lambda_subnet_ids                = var.lambda_subnet_ids
   lambda_security_group_ids        = var.lambda_security_group_ids
+  lambda_tags                      = var.lambda_tags
   tracing_config                   = var.tracing_config
   logging_retention_in_days        = var.logging_retention_in_days
   logging_kms_key_id               = var.logging_kms_key_id
@@ -288,6 +291,7 @@ module "runners" {
   pool_lambda_reserved_concurrent_executions = var.pool_lambda_reserved_concurrent_executions
 
   ssm_housekeeper = var.runners_ssm_housekeeper
+  ebs_optimized   = var.runners_ebs_optimized
 }
 
 module "runner_binaries" {
@@ -313,6 +317,7 @@ module "runner_binaries" {
   lambda_zip                      = var.runner_binaries_syncer_lambda_zip
   lambda_memory_size              = var.runner_binaries_syncer_lambda_memory_size
   lambda_timeout                  = var.runner_binaries_syncer_lambda_timeout
+  lambda_tags                     = var.lambda_tags
   tracing_config                  = var.tracing_config
   logging_retention_in_days       = var.logging_retention_in_days
   logging_kms_key_id              = var.logging_kms_key_id
@@ -352,6 +357,7 @@ module "ami_housekeeper" {
   lambda_security_group_ids = var.lambda_security_group_ids
   lambda_subnet_ids         = var.lambda_subnet_ids
   lambda_timeout            = var.ami_housekeeper_lambda_timeout
+  lambda_tags               = var.lambda_tags
   tracing_config            = var.tracing_config
 
   logging_retention_in_days = var.logging_retention_in_days
@@ -363,4 +369,33 @@ module "ami_housekeeper" {
 
   cleanup_config             = var.ami_housekeeper_cleanup_config
   lambda_schedule_expression = var.ami_housekeeper_lambda_schedule_expression
+}
+
+locals {
+  lambda_instance_termination_watcher = {
+    prefix                    = var.prefix
+    tags                      = local.tags
+    aws_partition             = var.aws_partition
+    architecture              = var.lambda_architecture
+    principals                = var.lambda_principals
+    runtime                   = var.lambda_runtime
+    security_group_ids        = var.lambda_security_group_ids
+    subnet_ids                = var.lambda_subnet_ids
+    lambda_tags               = var.lambda_tags
+    log_level                 = var.log_level
+    logging_kms_key_id        = var.logging_kms_key_id
+    logging_retention_in_days = var.logging_retention_in_days
+    role_path                 = var.role_path
+    role_permissions_boundary = var.role_permissions_boundary
+    metrics_namespace         = var.metrics_namespace
+    s3_bucket                 = var.lambda_s3_bucket
+    tracing_config            = var.tracing_config
+  }
+}
+
+module "instance_termination_watcher" {
+  source = "./modules/termination-watcher"
+  count  = var.instance_termination_watcher.enable ? 1 : 0
+
+  config = merge(local.lambda_instance_termination_watcher, var.instance_termination_watcher)
 }

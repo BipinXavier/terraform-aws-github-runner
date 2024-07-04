@@ -565,6 +565,15 @@ variable "enable_runner_workflow_job_labels_check_all" {
   default     = true
 }
 
+variable "matcher_config_parameter_store_tier" {
+  description = "The tier of the parameter store for the matcher configuration. Valid values are `Standard`, and `Advanced`."
+  type        = string
+  default     = "Standard"
+  validation {
+    condition     = contains(["Standard", "Advanced"], var.matcher_config_parameter_store_tier)
+    error_message = "`matcher_config_parameter_store_tier` value is not valid, valid values are: `Standard`, and `Advanced`."
+  }
+}
 variable "runner_ec2_tags" {
   description = "Map of tags that will be added to the launch template instance tag specifications."
   type        = map(string)
@@ -850,4 +859,49 @@ variable "runners_ssm_housekeeper" {
     })
   })
   default = { config = {} }
+}
+
+variable "metrics_namespace" {
+  description = "The namespace for the metrics created by the module. Merics will only be created if explicit enabled."
+  type        = string
+  default     = "GitHub Runners"
+}
+
+variable "instance_termination_watcher" {
+  description = <<-EOF
+    Configuration for the instance termination watcher. This feature is Beta, changes will not trigger a major release as long in beta.
+
+    `enable`: Enable or disable the spot termination watcher.
+    `enable_metrics`: Enable or disable the metrics for the spot termination watcher.
+    `memory_size`: Memory size linit in MB of the lambda.
+    `s3_key`: S3 key for syncer lambda function. Required if using S3 bucket to specify lambdas.
+    `s3_object_version`: S3 object version for syncer lambda function. Useful if S3 versioning is enabled on source bucket.
+    `timeout`: Time out of the lambda in seconds.
+    `zip`: File location of the lambda zip file.
+  EOF
+
+  type = object({
+    enable = optional(bool, false)
+    enable_metric = optional(object({
+      spot_warning = optional(bool, false)
+    }))
+    memory_size       = optional(number, null)
+    s3_key            = optional(string, null)
+    s3_object_version = optional(string, null)
+    timeout           = optional(number, null)
+    zip               = optional(string, null)
+  })
+  default = {}
+}
+
+variable "runners_ebs_optimized" {
+  description = "Enable EBS optimization for the runner instances."
+  type        = bool
+  default     = false
+}
+
+variable "lambda_tags" {
+  description = "Map of tags that will be added to all the lambda function resources. Note these are additional tags to the default tags."
+  type        = map(string)
+  default     = {}
 }
